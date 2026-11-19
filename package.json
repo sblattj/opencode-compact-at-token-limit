@@ -1,0 +1,22 @@
+{
+  "name": "opencode-compact-at-token-limit",
+  "version": "0.1.0",
+  "description": "OpenCode plugin that forces a session compaction when the context reaches a token limit (default 200000, configurable). Nothing else.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./server": "./src/index.js"
+  },
+  "files": ["src", "README.md", "LICENSE", "CHANGELOG.md"],
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "smoke:live": "node scripts/smoke-live-compaction.mjs"
+  },
+  "keywords": ["opencode", "opencode-plugin", "compaction", "context", "tokens"],
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "repository": { "type": "git", "url": "git+https://github.com/sblattj/opencode-compact-at-token-limit.git" },
+  "homepage": "https://github.com/sblattj/opencode-compact-at-token-limit#readme",
+  "bugs": { "url": "https://github.com/sblattj/opencode-compact-at-token-limit/issues" }
+}
