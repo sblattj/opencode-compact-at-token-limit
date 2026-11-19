@@ -1,6 +1,6 @@
 {
   "name": "opencode-compact-at-token-limit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "OpenCode plugin that forces a session compaction when the context reaches a token limit (default 200000, configurable). Nothing else.",
   "type": "module",
   "main": "./src/index.js",

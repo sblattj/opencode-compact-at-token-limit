@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1 - 2026-11-18
+
+- Releases now publish from GitHub Actions with npm trusted publishing (OIDC) and a provenance attestation. No npm token is involved. No code changes.
+
 ## 0.1.0 - 2026-11-18
 
 First release.
