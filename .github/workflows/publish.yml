@@ -1,0 +1,80 @@
+# Publish to npm on a v* tag with npm trusted publishing (GitHub OIDC) and
+# provenance. There is no NPM_TOKEN secret, and none should be added.
+#
+# Prerequisites, all registry-side:
+#   - npmjs.com -> opencode-compact-at-token-limit -> Settings -> Trusted
+#     Publisher: repo sblattj/opencode-compact-at-token-limit, workflow
+#     publish.yml. Renaming this file silently breaks the match.
+#   - A trusted publisher that sees no publish within about 2 days expires.
+#     Register it right before the tag push.
+#   - OIDC publishing needs npm >= 11.5.1 (installed below; node 22 ships 10).
+#   - Provenance needs a public repo.
+# The publish step is idempotent: a version already on npm is skipped, so a
+# re-run stays green. A version older than npm `latest` goes out under the
+# `backfill` dist-tag so `latest` never moves back.
+# Re-run a tag by hand: gh workflow run publish.yml -f tag=vX.Y.Z
+name: Publish
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to publish (for example v0.1.1)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - name: Check out the tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          registry-url: https://registry.npmjs.org
+      - name: Install npm with OIDC trusted publishing support
+        run: npm install -g npm@latest && npm --version
+      - name: Tag matches package.json version
+        run: node -e "const p=require('./package.json');const t=process.env.RELEASE_TAG;if(t!=='v'+p.version)throw new Error('tag '+t+' does not match package '+p.version)"
+      - name: Unit tests
+        run: npm test
+      - name: Tarball contents
+        run: npm pack --dry-run
+      - name: Publish to npm (idempotent)
+        run: |
+          set -euo pipefail
+          NAME=$(node -p "require('./package.json').name")
+          VERSION="${RELEASE_TAG#v}"
+          if [ "$(npm view "$NAME@$VERSION" version 2>/dev/null || true)" = "$VERSION" ]; then
+            echo "::notice::$NAME@$VERSION is already on npm; skipping publish"
+            exit 0
+          fi
+          LATEST="$(npm view "$NAME" dist-tags.latest 2>/dev/null || true)"
+          DIST_TAG=latest
+          if [ -n "$LATEST" ] && [ "$(printf '%s\n%s\n' "$LATEST" "$VERSION" | sort -V | tail -n1)" != "$VERSION" ]; then
+            DIST_TAG=backfill
+            echo "::notice::$VERSION is older than npm latest $LATEST; publishing under dist-tag '$DIST_TAG'"
+          fi
+          npm publish --provenance --access public --tag "$DIST_TAG"
+      - name: GitHub release (idempotent)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" >/dev/null 2>&1 \
+            || gh release create "$RELEASE_TAG" --title "$RELEASE_TAG" --generate-notes \
+            || gh release view "$RELEASE_TAG" >/dev/null
