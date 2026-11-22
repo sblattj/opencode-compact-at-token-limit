@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2 - 2026-11-22
+
+- Fixed: one compaction per crossing. On a model with `limit.context` 0, `session.idle` could arrive while a finished step was still asking the host about the model, and both paths sent `session.summarize`, so every crossing compacted twice. Seen live on OpenCode 1.19.0 (two `forcing compaction` lines 11 ms apart, two summary messages); now one.
+
 ## 0.1.1 - 2026-11-18
 
 - Releases now publish from GitHub Actions with npm trusted publishing (OIDC) and a provenance attestation. No npm token is involved. No code changes.
