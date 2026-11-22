@@ -248,6 +248,8 @@ export const ContextCapPlugin = async (input = {}, options = {}) => {
         log("info", `${sessionID} over the limit; leaving this step to the host's own compaction`)
         return
       }
+      // The host lookup above yields, and session.idle can send a request meanwhile.
+      if (!allowed(state)) return
       requestCompaction(sessionID, state, tokens)
     }
   }

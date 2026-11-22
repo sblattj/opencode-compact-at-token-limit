@@ -13,7 +13,7 @@ import plugin, {
 const MODEL = { providerID: "test", modelID: "test-model" }
 
 // A fake v1 plugin client: records summarize calls and log lines.
-function fakeClient({ hostContextLimit = 0, summarize } = {}) {
+function fakeClient({ hostContextLimit = 0, summarize, providersDelayMs = 0 } = {}) {
   const calls = { summarize: [], logs: [] }
   const client = {
     session: {
@@ -23,13 +23,16 @@ function fakeClient({ hostContextLimit = 0, summarize } = {}) {
       },
     },
     config: {
-      providers: async () => ({
+      providers: async () => {
+        if (providersDelayMs) await new Promise((resolve) => setTimeout(resolve, providersDelayMs))
+        return {
         data: {
           providers: [
             { id: MODEL.providerID, models: { [MODEL.modelID]: { limit: { context: hostContextLimit } } } },
           ],
         },
-      }),
+        }
+      },
     },
     app: {
       log: async ({ body }) => {
@@ -297,6 +300,16 @@ test("idle backstop: a turn that ended over the limit with no request sent force
   const { hooks, calls } = await boot({ limit: 1000 }, { hostContextLimit: 128000 })
   await hooks.event({ event: step("ses_a", tokensOf(1000)) }) // grace step, no request
   await hooks.event({ event: idle("ses_a") })
+  assert.equal(calls.summarize.length, 1)
+})
+
+test("idle during the step's host lookup does not double the request (one compaction per crossing)", async () => {
+  // Live on OpenCode 1.19.0 with a limit.context 0 model: session.idle arrived while the
+  // step handler awaited config.providers(), and both paths sent session.summarize.
+  const { hooks, calls } = await boot({ limit: 1000 }, { providersDelayMs: 20 })
+  const stepDone = hooks.event({ event: step("ses_a", tokensOf(4000)) })
+  await hooks.event({ event: idle("ses_a") })
+  await stepDone
   assert.equal(calls.summarize.length, 1)
 })
 
